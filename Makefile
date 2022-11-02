@@ -19,4 +19,7 @@ psql:
 nix-fish:
 	nix-shell --command fish
 
+sqlc:
+	sqlc generate
+
 .PHONY: createdb dropdb postgres migrateup migratedown psql
