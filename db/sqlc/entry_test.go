@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/mrityunjaygr8/simplebank/utils"
 	"github.com/stretchr/testify/require"
@@ -30,6 +31,20 @@ func createRandomEntry(t *testing.T) Entry {
 
 func TestCreateEntry(t *testing.T) {
 	createRandomEntry(t)
+}
+
+func TestGetEntry(t *testing.T) {
+	entry1 := createRandomEntry(t)
+
+	entry2, err := testQueries.GetEntry(context.Background(), entry1.ID)
+	require.NoError(t, err)
+	require.NotEmpty(t, entry2)
+
+	require.Equal(t, entry2.ID, entry1.ID)
+	require.Equal(t, entry2.AccountID, entry1.AccountID)
+	require.Equal(t, entry2.Amount, entry1.Amount)
+	require.WithinDuration(t, entry2.CreatedAt, entry1.CreatedAt, time.Second)
+
 }
 
 func TestListEntry(t *testing.T) {
