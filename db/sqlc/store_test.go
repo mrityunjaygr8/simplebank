@@ -2,9 +2,9 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
-	"github.com/mrityunjaygr8/simplebank/utils"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,9 +16,11 @@ func TestTransferTx(t *testing.T) {
 
 	errs := make(chan error)
 	results := make(chan TransferTxResult)
+	existed := make(map[int]bool)
+	fmt.Println(">> before: ", account1.Balance, account2.Balance)
 
 	n := 5
-	amount := int64(utils.RandomMoney())
+	amount := int64(10)
 
 	for x := 0; x < n; x++ {
 		go func() {
@@ -75,13 +77,35 @@ func TestTransferTx(t *testing.T) {
 		require.NoError(t, err)
 
 		// TODO: for later
-		// from_account := result.FromAccount
-		// require.NotEmpty(t, from_account)
-		//
-		// require.Equal(t, account1.ID, from_account.ID)
-		// require.Equal(t, account1.Currency, from_account.Currency)
-		//
-		//   _, err = store.GetAcc
+		from_account := result.FromAccount
+		require.NotEmpty(t, from_account)
+		require.Equal(t, account1.ID, from_account.ID)
+
+		to_account := result.ToAccount
+		require.NotEmpty(t, to_account)
+		require.Equal(t, account2.ID, to_account.ID)
+
+		fmt.Println(">> tx: ", from_account.Balance, to_account.Balance)
+		diff1 := account1.Balance - from_account.Balance
+		diff2 := to_account.Balance - account2.Balance
+
+		require.Equal(t, diff1, diff2)
+		require.True(t, diff1 > 0)
+		require.True(t, diff1%amount == 0) // 1 * amount, 2 * amount, ... n * amount
+
+		k := int(diff1 / amount)
+		require.True(t, k >= 1 && k <= n)
+		require.NotContains(t, existed, k)
+		existed[k] = true
 	}
+
+	updatedAccount1, err := testQueries.GetAccount(context.Background(), account1.ID)
+	require.NoError(t, err)
+	updatedAccount2, err := testQueries.GetAccount(context.Background(), account2.ID)
+	require.NoError(t, err)
+	fmt.Println(">> after: ", account1.Balance, account2.Balance)
+
+	require.Equal(t, account1.Balance-int64(n)*amount, updatedAccount1.Balance)
+	require.Equal(t, account2.Balance+int64(n)*amount, updatedAccount2.Balance)
 
 }
