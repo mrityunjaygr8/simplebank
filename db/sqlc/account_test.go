@@ -95,8 +95,7 @@ func TestListAccounts(t *testing.T) {
 	require.NotEmpty(t, accounts)
 	require.Equal(t, len(accounts), 5)
 
-	for _, x := range accounts {
-		require.NotEmpty(t, x)
+	for _, account := range accounts {
+		require.NotEmpty(t, account)
 	}
-
 }
