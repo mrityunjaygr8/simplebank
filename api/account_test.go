@@ -113,3 +113,136 @@ func requireBodyMatchAccount(t *testing.T, body *bytes.Buffer, account db.Accoun
 
 	require.Equal(t, account, gotAccount)
 }
+
+func TestListAccountsApi(t *testing.T) {
+	var accounts []db.Account
+	for i := 0; i < 10; i++ {
+		accounts = append(accounts, randomAccount())
+	}
+	// page_id := int32(1)
+	// page_size := int32(1)
+
+	testCases := []struct {
+		name          string
+		page_size     int32
+		page_id       int32
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name:      "OK",
+			page_id:   1,
+			page_size: 5,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListAccounts(gomock.Any(), gomock.Eq(db.ListAccountsParams{
+					Limit:  5,
+					Offset: 0,
+				})).Times(1).Return(accounts[0:5], nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				requireBodyMatchAccounts(t, recorder.Body, accounts[0:5])
+			},
+		},
+		{
+			name:      "NoRowsReturnBlank",
+			page_id:   15,
+			page_size: 5,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListAccounts(gomock.Any(), gomock.Eq(db.ListAccountsParams{
+					Limit:  5,
+					Offset: 70,
+				})).Times(1).Return([]db.Account{}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				requireBodyMatchAccounts(t, recorder.Body, []db.Account{})
+			},
+		},
+		{
+			name:      "InvalidPage",
+			page_id:   0,
+			page_size: 5,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListAccounts(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				// requireBodyMatchAccounts(t, recorder.Body, []db.Account{})
+			},
+		},
+		{
+			name:      "LessPageSize",
+			page_id:   5,
+			page_size: 0,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListAccounts(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				// requireBodyMatchAccounts(t, recorder.Body, []db.Account{})
+			},
+		},
+		{
+			name:      "MorePageSize",
+			page_id:   5,
+			page_size: 0,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListAccounts(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+				// requireBodyMatchAccounts(t, recorder.Body, []db.Account{})
+			},
+		},
+		{
+			name:      "InternalError",
+			page_id:   1,
+			page_size: 5,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListAccounts(gomock.Any(), gomock.Eq(db.ListAccountsParams{
+					Limit:  5,
+					Offset: 0,
+				})).Times(1).Return(nil, sql.ErrConnDone)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusInternalServerError, recorder.Code)
+				// requireBodyMatchAccounts(t, recorder.Body, []db.Account{})
+			},
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			store := mockdb.NewMockStore(ctrl)
+			tc.buildStubs(store)
+			server := NewServer(store)
+
+			recorder := httptest.NewRecorder()
+
+			url := fmt.Sprintf("/accounts?page_size=%d&page_id=%d", tc.page_size, tc.page_id)
+			request, err := http.NewRequest(http.MethodGet, url, nil)
+			require.NoError(t, err)
+
+			server.router.ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+
+		})
+	}
+
+}
+func requireBodyMatchAccounts(t *testing.T, body *bytes.Buffer, accounts []db.Account) {
+	data, err := ioutil.ReadAll(body)
+	require.NoError(t, err)
+
+	var gotAccounts []db.Account
+
+	err = json.Unmarshal(data, &gotAccounts)
+	require.NoError(t, err)
+
+	require.Equal(t, accounts, gotAccounts)
+}
