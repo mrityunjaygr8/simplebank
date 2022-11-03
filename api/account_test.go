@@ -230,11 +230,10 @@ func TestListAccountsApi(t *testing.T) {
 
 			server.router.ServeHTTP(recorder, request)
 			tc.checkResponse(t, recorder)
-
 		})
 	}
-
 }
+
 func requireBodyMatchAccounts(t *testing.T, body *bytes.Buffer, accounts []db.Account) {
 	data, err := ioutil.ReadAll(body)
 	require.NoError(t, err)
@@ -245,4 +244,122 @@ func requireBodyMatchAccounts(t *testing.T, body *bytes.Buffer, accounts []db.Ac
 	require.NoError(t, err)
 
 	require.Equal(t, accounts, gotAccounts)
+}
+
+func TestCreateAccountApi(t *testing.T) {
+	testCases := []struct {
+		name          string
+		owner         string
+		currency      string
+		jsonStr       []byte
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name:     "OK",
+			owner:    "yo",
+			currency: "USD",
+			jsonStr:  []byte(`{"owner": "yo", "currency": "USD"}`),
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().CreateAccount(gomock.Any(), gomock.Eq(db.CreateAccountParams{
+					Owner:    "yo",
+					Balance:  0,
+					Currency: "USD",
+				})).Times(1).Return(db.Account{Owner: "yo", Currency: "USD", Balance: 0}, nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusCreated, recorder.Code)
+				requireBodyMatchCreateAccount(t, recorder.Body, db.Account{Owner: "yo", Currency: "USD", Balance: 0})
+			},
+		},
+		{
+			name:     "BadCurrency",
+			owner:    "yo",
+			currency: "USD",
+			jsonStr:  []byte(`{"owner": "yo", "currency": "USD123"}`),
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().CreateAccount(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+
+			},
+		},
+		{
+			name:     "BlankCurrency",
+			owner:    "yo",
+			currency: "",
+			jsonStr:  []byte(`{"owner": "yo", "currency": ""}`),
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().CreateAccount(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
+		{
+			name:     "BlankOwner",
+			owner:    "",
+			currency: "USD",
+			jsonStr:  []byte(`{"owner": "", "currency": "USD"}`),
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().CreateAccount(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
+		{
+			name:     "InternalError",
+			owner:    "qwe",
+			currency: "USD",
+			jsonStr:  []byte(`{"owner": "qwe", "currency": "USD"}`),
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().CreateAccount(gomock.Any(), gomock.Eq(db.CreateAccountParams{
+					Owner:    "qwe",
+					Balance:  0,
+					Currency: "USD",
+				})).Times(1).Return(db.Account{}, sql.ErrConnDone)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusInternalServerError, recorder.Code)
+			},
+		},
+	}
+
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			store := mockdb.NewMockStore(ctrl)
+			tc.buildStubs(store)
+			server := NewServer(store)
+
+			recorder := httptest.NewRecorder()
+
+			url := fmt.Sprintf("/accounts")
+			request, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(tc.jsonStr))
+			request.Header.Add("Content-Type", "application/json")
+			require.NoError(t, err)
+
+			server.router.ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+
+		})
+	}
+
+}
+
+func requireBodyMatchCreateAccount(t *testing.T, body *bytes.Buffer, account db.Account) {
+	data, err := ioutil.ReadAll(body)
+	require.NoError(t, err)
+
+	var gotAccount db.Account
+
+	err = json.Unmarshal(data, &gotAccount)
+	require.NoError(t, err)
+
+	require.Equal(t, account, gotAccount)
 }
