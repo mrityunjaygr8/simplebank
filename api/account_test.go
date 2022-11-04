@@ -30,10 +30,9 @@ func TestGetAccountApi(t *testing.T) {
 	account := randomAccount()
 
 	testCases := []struct {
-		name       string
-		accountID  int64
-		buildStubs func(store *mockdb.MockStore)
-
+		name          string
+		accountID     int64
+		buildStubs    func(store *mockdb.MockStore)
 		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
 	}{
 		{
