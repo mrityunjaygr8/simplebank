@@ -65,3 +65,35 @@ func TestListEntry(t *testing.T) {
 		require.NotEmpty(t, entry)
 	}
 }
+
+func TestListEntryForAccount(t *testing.T) {
+	account := createRandomAccount(t)
+	entries := []Entry{}
+
+	for x := 0; x < 10; x++ {
+		arg := CreateEntryParams{
+			AccountID: account.ID,
+			Amount:    utils.RandomMoney(),
+		}
+
+		entry, err := testQueries.CreateEntry(context.Background(), arg)
+		require.NoError(t, err)
+		require.NotEmpty(t, entry)
+
+		entries = append(entries, entry)
+	}
+
+	arg := ListEntriesForAccountParams{
+		Limit:     5,
+		Offset:    5,
+		AccountID: account.ID,
+	}
+	entries, err := testQueries.ListEntriesForAccount(context.Background(), arg)
+	require.NoError(t, err)
+	require.NotEmpty(t, entries)
+	require.Equal(t, len(entries), 5)
+
+	for _, entry := range entries {
+		require.NotEmpty(t, entry)
+	}
+}

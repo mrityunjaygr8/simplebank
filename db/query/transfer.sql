@@ -15,3 +15,9 @@ WHERE id = $1 LIMIT 1;
 SELECT * FROM transfers
 LIMIT $1
 OFFSET $2;
+
+-- name: ListTransfersForAccount :many
+SELECT * FROM transfers
+WHERE from_account_id = sqlc.arg(account_id) OR to_account_id = sqlc.arg(account_id)
+LIMIT $1
+OFFSET $2;

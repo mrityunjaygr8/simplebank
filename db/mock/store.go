@@ -184,6 +184,21 @@ func (mr *MockStoreMockRecorder) ListEntries(arg0, arg1 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEntries", reflect.TypeOf((*MockStore)(nil).ListEntries), arg0, arg1)
 }
 
+// ListEntriesForAccount mocks base method.
+func (m *MockStore) ListEntriesForAccount(arg0 context.Context, arg1 db.ListEntriesForAccountParams) ([]db.Entry, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEntriesForAccount", arg0, arg1)
+	ret0, _ := ret[0].([]db.Entry)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEntriesForAccount indicates an expected call of ListEntriesForAccount.
+func (mr *MockStoreMockRecorder) ListEntriesForAccount(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEntriesForAccount", reflect.TypeOf((*MockStore)(nil).ListEntriesForAccount), arg0, arg1)
+}
+
 // ListTransfers mocks base method.
 func (m *MockStore) ListTransfers(arg0 context.Context, arg1 db.ListTransfersParams) ([]db.Transfer, error) {
 	m.ctrl.T.Helper()
@@ -197,6 +212,21 @@ func (m *MockStore) ListTransfers(arg0 context.Context, arg1 db.ListTransfersPar
 func (mr *MockStoreMockRecorder) ListTransfers(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTransfers", reflect.TypeOf((*MockStore)(nil).ListTransfers), arg0, arg1)
+}
+
+// ListTransfersForAccount mocks base method.
+func (m *MockStore) ListTransfersForAccount(arg0 context.Context, arg1 db.ListTransfersForAccountParams) ([]db.Transfer, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListTransfersForAccount", arg0, arg1)
+	ret0, _ := ret[0].([]db.Transfer)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListTransfersForAccount indicates an expected call of ListTransfersForAccount.
+func (mr *MockStoreMockRecorder) ListTransfersForAccount(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTransfersForAccount", reflect.TypeOf((*MockStore)(nil).ListTransfersForAccount), arg0, arg1)
 }
 
 // TransferTx mocks base method.

@@ -69,5 +69,39 @@ func TestListTransfers(t *testing.T) {
 	for _, transfer := range transfers {
 		require.NotEmpty(t, transfer)
 	}
+}
+
+func TestListTransfersForAccount(t *testing.T) {
+	account1 := createRandomAccount(t)
+	account2 := createRandomAccount(t)
+	for x := 0; x < 10; x++ {
+		var transfer CreateTransferParams
+		transfer.Amount = utils.RandomMoney()
+		if x%2 == 0 {
+			transfer.FromAccountID = account1.ID
+			transfer.ToAccountID = account2.ID
+		} else {
+			transfer.FromAccountID = account2.ID
+			transfer.ToAccountID = account1.ID
+		}
+
+		_, err := testQueries.CreateTransfer(context.Background(), transfer)
+		require.NoError(t, err)
+	}
+
+	arg := ListTransfersForAccountParams{
+		Limit:     5,
+		Offset:    0,
+		AccountID: account1.ID,
+	}
+
+	transfers1, err := testQueries.ListTransfersForAccount(context.Background(), arg)
+	require.NoError(t, err)
+	require.NotEmpty(t, transfers1)
+	require.Equal(t, len(transfers1), 5)
+
+	for _, transfer := range transfers1 {
+		require.NotEmpty(t, transfer)
+	}
 
 }

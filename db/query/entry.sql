@@ -15,3 +15,8 @@ SELECT * FROM entries
 LIMIT $1
 OFFSET $2;
 
+-- name: ListEntriesForAccount :many
+SELECT * FROM entries
+WHERE account_id = $3
+LIMIT $1
+OFFSET $2;

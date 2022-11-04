@@ -90,3 +90,44 @@ func (q *Queries) ListEntries(ctx context.Context, arg ListEntriesParams) ([]Ent
 	}
 	return items, nil
 }
+
+const listEntriesForAccount = `-- name: ListEntriesForAccount :many
+SELECT id, account_id, amount, created_at FROM entries
+WHERE account_id = $3
+LIMIT $1
+OFFSET $2
+`
+
+type ListEntriesForAccountParams struct {
+	Limit     int32 `json:"limit"`
+	Offset    int32 `json:"offset"`
+	AccountID int64 `json:"account_id"`
+}
+
+func (q *Queries) ListEntriesForAccount(ctx context.Context, arg ListEntriesForAccountParams) ([]Entry, error) {
+	rows, err := q.db.QueryContext(ctx, listEntriesForAccount, arg.Limit, arg.Offset, arg.AccountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Entry{}
+	for rows.Next() {
+		var i Entry
+		if err := rows.Scan(
+			&i.ID,
+			&i.AccountID,
+			&i.Amount,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
