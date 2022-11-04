@@ -8,8 +8,7 @@ CREATE TABLE IF NOT EXISTS "users" (
   "email" varchar UNIQUE NOT NULL
 );
 
--- ALTER TABLE "accounts" ADD FOREIGN KEY ("owner") REFERENCES "users" ("username");
---
+ALTER TABLE "accounts" ADD FOREIGN KEY ("owner") REFERENCES "users" ("username");
 -- -- CREATE UNIQUE INDEX IF NOT EXISTS ON "accounts" ("owner", "currency");
--- ALTER TABLE "accounts" ADD CONSTRAINT "owner_currency_key" UNIQUE ("owner", "currency");
+ALTER TABLE "accounts" ADD CONSTRAINT "owner_currency_key" UNIQUE ("owner", "currency");
 COMMIT;
