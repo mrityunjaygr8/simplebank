@@ -13,9 +13,19 @@ import (
 	"github.com/golang/mock/gomock"
 	mockdb "github.com/mrityunjaygr8/simplebank/db/mock"
 	db "github.com/mrityunjaygr8/simplebank/db/sqlc"
+	"github.com/mrityunjaygr8/simplebank/utils"
 	"github.com/stretchr/testify/require"
 )
 
+func randomTransfer() db.Transfer {
+	return db.Transfer{
+		ID:            utils.RandomInt(1, 1000),
+		FromAccountID: utils.RandomInt(1, 100),
+		ToAccountID:   utils.RandomInt(101, 200),
+		Amount:        utils.RandomMoney(),
+	}
+
+}
 func TestCreateTransferApi(t *testing.T) {
 	account1 := randomAccount()
 	account1.Currency = "USD"
@@ -239,4 +249,210 @@ func requireBodyMatchError(t *testing.T, body *bytes.Buffer, expected string) {
 	require.NoError(t, err)
 
 	require.Equal(t, expected, gotError.Error)
+}
+func TestListTransfers(t *testing.T) {
+	var transfers []db.Transfer
+	for x := 0; x < 10; x++ {
+		transfers = append(transfers, randomTransfer())
+
+	}
+
+	testCases := []struct {
+		name          string
+		page_size     int32
+		page_id       int32
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name:      "OK",
+			page_size: 5,
+			page_id:   1,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListTransfers(gomock.Any(), gomock.Eq(db.ListTransfersParams{
+					Limit:  5,
+					Offset: 0,
+				})).Times(1).Return(transfers[0:5], nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				requireBodyMatchListTransfer(t, recorder.Body, transfers[0:5])
+			},
+		},
+		{
+			name:      "Zero-Page",
+			page_size: 5,
+			page_id:   0,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListTransfers(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
+		{
+			name:      "Big-Page-Size",
+			page_size: 50,
+			page_id:   0,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListTransfers(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
+		{
+			name:      "Internal-error",
+			page_size: 5,
+			page_id:   1,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListTransfers(gomock.Any(), gomock.Eq(db.ListTransfersParams{
+					Limit:  5,
+					Offset: 0,
+				})).Times(1).Return([]db.Transfer{}, sql.ErrConnDone)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusInternalServerError, recorder.Code)
+			},
+		},
+	}
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			store := mockdb.NewMockStore(ctrl)
+			tc.buildStubs(store)
+			server := NewServer(store)
+
+			recorder := httptest.NewRecorder()
+
+			url := fmt.Sprintf("/transfers?page_size=%d&page_id=%d", tc.page_size, tc.page_id)
+			request, err := http.NewRequest(http.MethodGet, url, nil)
+			require.NoError(t, err)
+
+			server.router.ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
+}
+
+func requireBodyMatchListTransfer(t *testing.T, body *bytes.Buffer, transfers []db.Transfer) {
+	data, err := ioutil.ReadAll(body)
+	require.NoError(t, err)
+
+	var gotTransfers []db.Transfer
+
+	err = json.Unmarshal(data, &gotTransfers)
+	require.NoError(t, err)
+
+	require.Equal(t, transfers, gotTransfers)
+}
+func TestListTransfersForAccount(t *testing.T) {
+	var transfers []db.Transfer
+	for x := 0; x < 10; x++ {
+		transfer := randomTransfer()
+		transfer.FromAccountID = 1
+		transfers = append(transfers, transfer)
+	}
+
+	testCases := []struct {
+		name          string
+		page_size     int32
+		page_id       int32
+		account_id    int64
+		buildStubs    func(store *mockdb.MockStore)
+		checkResponse func(t *testing.T, recorder *httptest.ResponseRecorder)
+	}{
+		{
+			name:       "OK",
+			page_size:  5,
+			page_id:    1,
+			account_id: 1,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListTransfersForAccount(gomock.Any(), gomock.Eq(db.ListTransfersForAccountParams{
+					Limit:     5,
+					Offset:    0,
+					AccountID: 1,
+				})).Times(1).Return(transfers[0:5], nil)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusOK, recorder.Code)
+				requireBodyMatchListTransfer(t, recorder.Body, transfers[0:5])
+			},
+		},
+		{
+			name:       "Zero-Page",
+			page_size:  5,
+			page_id:    0,
+			account_id: 1,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListTransfersForAccount(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
+		{
+			name:       "Big-Page-Size",
+			page_size:  50,
+			page_id:    0,
+			account_id: 1,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListTransfersForAccount(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
+		{
+			name:       "Internal-error",
+			page_size:  5,
+			page_id:    1,
+			account_id: 1,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListTransfersForAccount(gomock.Any(), gomock.Eq(db.ListTransfersForAccountParams{
+					Limit:     5,
+					Offset:    0,
+					AccountID: 1,
+				})).Times(1).Return([]db.Transfer{}, sql.ErrConnDone)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusInternalServerError, recorder.Code)
+			},
+		},
+		{
+			name:       "Bad-ACcount-id",
+			page_size:  5,
+			page_id:    1,
+			account_id: 0,
+			buildStubs: func(store *mockdb.MockStore) {
+				store.EXPECT().ListTransfersForAccount(gomock.Any(), gomock.Any()).Times(0)
+			},
+			checkResponse: func(t *testing.T, recorder *httptest.ResponseRecorder) {
+				require.Equal(t, http.StatusBadRequest, recorder.Code)
+			},
+		},
+	}
+	for i := range testCases {
+		tc := testCases[i]
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			store := mockdb.NewMockStore(ctrl)
+			tc.buildStubs(store)
+			server := NewServer(store)
+
+			recorder := httptest.NewRecorder()
+
+			url := fmt.Sprintf("/transfers/%d?page_size=%d&page_id=%d", tc.account_id, tc.page_size, tc.page_id)
+			request, err := http.NewRequest(http.MethodGet, url, nil)
+			require.NoError(t, err)
+
+			server.router.ServeHTTP(recorder, request)
+			tc.checkResponse(t, recorder)
+		})
+	}
 }
